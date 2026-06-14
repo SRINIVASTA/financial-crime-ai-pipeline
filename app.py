@@ -43,13 +43,13 @@ CUST_110,18.9,0,CLEARED"""
 gcp_pandas_df = pd.read_csv(io.StringIO(gcp_watchlist_data))
 gcp_spark_df = spark.createDataFrame(gcp_pandas_df)
 
-# Initialize interface layout elements
+# FIX: Initialize container anchors to prevent metrics from stacking on screen
 status_box = st.empty()
-metric_col1, metric_col2, metric_col3 = st.columns(3)
+metric_anchor = st.empty()
 
 st.write("---")
 
-# Main interface structure - Explicitly passing 2 to fix the columns TypeError!
+# Main interface structure splitting real-time data views from exporters
 left_view, right_view = st.columns(2)
 
 with left_view:
@@ -110,14 +110,17 @@ while True:
     # Build the full archive log view model
     historical_aggregate_df = pd.DataFrame(st.session_state.cumulative_ledger)
     
-    # 5. REFRESH REAL-TIME METRIC CARDS
+    # 5. REFRESH REAL-TIME METRIC CARDS INSIDE ACCURATE BLOCKS
     total_processed_rows = len(aws_pandas_df)
     latest_alert_count = len(current_batch_pandas)
     total_archived_count = len(historical_aggregate_df)
     
-    metric_col1.metric(label="Ingested Inbound Rows", value=f"+{num_tx}", delta=f"Batch Total: {total_processed_rows}")
-    metric_col2.metric(label="Latest Batch Alerts", value=latest_alert_count, delta="Current Cycle", delta_color="inverse")
-    metric_col3.metric(label="Total Stored Audit Trails", value=total_archived_count)
+    # Re-render metrics inside the clean block container anchor (Removes stacking duplication!)
+    with metric_anchor.container():
+        m_col1, m_col2, m_col3 = st.columns(3)
+        m_col1.metric(label="Ingested Inbound Rows", value=f"+{num_tx}", delta=f"Batch Total: {total_processed_rows}")
+        m_col2.metric(label="Latest Batch Alerts", value=latest_alert_count, delta="Current Cycle", delta_color="inverse")
+        m_col3.metric(label="Total Stored Audit Trails", value=total_archived_count)
 
     # 6. RENDER THE CURRENT BATCH LOG AT THE TOP (CAPPED TO TOP 3 HIGHEST-VALUE ROWS)
     latest_header.markdown(f"### 🔴 Latest Live Ingestion Batch Alerts ({current_time}) — *Showing Top 3 Priority Alerts*")
