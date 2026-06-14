@@ -19,7 +19,6 @@ def init_spark():
 spark = init_spark()
 
 # 2. STATE MANAGEMENT FOR PERSISTENT AUDIT LOGS
-# Initialize an empty session state list to store cumulative data rows across refreshes
 if 'cumulative_alerts' not in st.session_state:
     st.session_state.cumulative_alerts = []
 
@@ -104,12 +103,9 @@ while True:
     
     # 4. STORE AND APPEND DATA IN THE HISTORY LOG
     if not alerts_pandas.empty:
-        # Format columns safely
         clean_batch = alerts_pandas[['CUSTOMER_ID', 'TX_TIMESTAMP', 'AMOUNT', 'LOCATION', 'CHANNEL', 'RISK_SCORE', 'WATCHLIST_STATUS']].copy()
-        
-        # Add to session state memory storage
         for _, row in clean_batch.iterrows():
-            st.session_state.cumulative_alerts.insert(0, row.to_dict()) # Insert at top of memory index
+            st.session_state.cumulative_alerts.insert(0, row.to_dict()) # Insert at top
 
     # Convert cumulative tracking data into an analytical DataFrame
     all_historical_df = pd.DataFrame(st.session_state.cumulative_alerts)
@@ -135,7 +131,6 @@ while True:
     historical_title.markdown("### 📜 Historical Compliance Archive Logs (Pushed Down)")
     if cumulative_flagged_count > 0:
         display_historical = all_historical_df.copy()
-        # Format the values for the layout view grid cleanly
         display_historical['AMOUNT'] = display_historical['AMOUNT'].apply(lambda x: f"₹{x:,.2f}")
         historical_table_placeholder.dataframe(display_historical, use_container_width=True)
         
@@ -144,12 +139,13 @@ while True:
         all_historical_df.to_csv(csv_buffer, index=False)
         csv_string = csv_buffer.getvalue()
         
+        # FIX: Appending a dynamic epoch timestamp key prevents duplicate identifier exceptions!
         download_placeholder.download_button(
             label="📥 Download Audit Logs (.CSV)",
             data=csv_string,
             file_name=f"cba_aml_audit_log_{time.strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv",
-            key="csv_download_btn"
+            key=f"csv_download_btn_{int(time.time())}"
         )
     else:
         historical_table_placeholder.info("System initializing. Awaiting cumulative streaming anomalies...")
