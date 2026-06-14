@@ -2,7 +2,7 @@
 
 An enterprise-grade, cloud-deployed **PySpark** and **Streamlit** data application engineering pipeline. This platform emulates real-world, multi-cloud financial operations by streaming synthetic transactional ledgers, cross-referencing global risk watchlists, and generating live categorical compliance analytics.
 
-🚀 **Live Production Application:** `https://financial-crime-ai-pipeline-favmurceuez7ffyjuzsbap.streamlit.app/`
+🚀 **Live Production Application:** (https://financial-crime-ai-pipeline-favmurceuez7ffyjuzsbap.streamlit.app/)
 
 ---
 
