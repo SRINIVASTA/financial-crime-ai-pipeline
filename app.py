@@ -11,7 +11,7 @@ from pyspark.sql import functions as F
 @st.cache_resource
 def init_spark():
     return SparkSession.builder \
-        .appName("CBA-Desktop-Streaming-Engine") \
+        .appName("Desktop-Streaming-Engine") \
         .config("spark.driver.memory", "1g") \
         .config("spark.executor.memory", "1g") \
         .config("spark.sql.shuffle.partitions", "2") \
@@ -24,8 +24,8 @@ if 'cumulative_ledger' not in st.session_state:
     st.session_state.cumulative_ledger = []
 
 # Set up desktop dashboard UI layout
-st.set_page_config(page_title="CBA Financial Crime Monitor", layout="wide")
-st.title("🛡️ Commonwealth Bank - Financial Crime AI Desktop Monitor")
+st.set_page_config(page_title="Financial Crime Monitor", layout="wide")
+st.title("🛡️ Financial Crime AI Desktop Monitor")
 st.subheader("Live Multi-Cloud Transaction Streaming & AML Risk Detection Engine")
 
 # Setup static GCP Watchlist Reference Data in memory
