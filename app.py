@@ -6,12 +6,14 @@ import io
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
-# 1. INITIALIZE SECURE CACHED PYSPARK SESSION
+# 1. INITIALIZE SECURE CACHED PYSPARK SESSION WITH CLOUD MEMORY CONSTRAINTS
 @st.cache_resource
 def init_spark():
     return SparkSession.builder \
         .appName("CBA-Desktop-Streaming-Engine") \
-        .config("spark.driver.memory", "2g") \
+        .config("spark.driver.memory", "1g") \
+        .config("spark.executor.memory", "1g") \
+        .config("spark.sql.shuffle.partitions", "2") \
         .getOrCreate()
 
 spark = init_spark()
