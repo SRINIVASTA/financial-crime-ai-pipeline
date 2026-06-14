@@ -6,7 +6,7 @@ import io
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
-# 1. INITIALIZE SECURE CACHED PYSPARK SESSION WITH CLOUD MEMORY CONSTRAINTS
+# 1. INITIALIZE SECURE CACHED PYSPARK SESSION
 @st.cache_resource
 def init_spark():
     return SparkSession.builder \
@@ -18,9 +18,14 @@ def init_spark():
 
 spark = init_spark()
 
-# Set up desktop dashboard layout
-st.set_page_config(page_title="Financial Crime Monitor", layout="wide")
-st.title("🛡️ Financial Crime AI Desktop Monitor")
+# 2. STATE MANAGEMENT FOR PERSISTENT AUDIT LOGS
+# Initialize an empty session state list to store cumulative data rows across refreshes
+if 'cumulative_alerts' not in st.session_state:
+    st.session_state.cumulative_alerts = []
+
+# Set up desktop dashboard UI layout
+st.set_page_config(page_title="CBA Financial Crime Monitor", layout="wide")
+st.title("🛡️ Commonwealth Bank - Financial Crime AI Desktop Monitor")
 st.subheader("Live Multi-Cloud Transaction Streaming & AML Risk Detection Engine")
 
 # Setup static GCP Watchlist Reference Data in memory
@@ -39,20 +44,36 @@ CUST_110,18.9,0,CLEARED"""
 gcp_pandas_df = pd.read_csv(io.StringIO(gcp_watchlist_data))
 gcp_spark_df = spark.createDataFrame(gcp_pandas_df)
 
-# Initialize Streamlit placeholder components
+# Initialize persistent layout placeholders
 status_box = st.empty()
 metric_col1, metric_col2, metric_col3 = st.columns(3)
-table_title = st.empty()
-alert_table_placeholder = st.empty()
+
+st.write("---")
+
+# Left Column for Live Stream / Right Column for CSV Exporter Controls
+left_ui, right_ui = st.columns([3, 1])
+
+with left_ui:
+    latest_title = st.empty()
+    latest_table_placeholder = st.empty()
+    st.write("---")
+    historical_title = st.empty()
+    historical_table_placeholder = st.empty()
+
+with right_ui:
+    st.markdown("### 🗃️ Compliance Export Control")
+    download_placeholder = st.empty()
+    st.write(" ")
+    clear_logs_button = st.button("🚨 Clear Cumulative Audit Logs")
+    if clear_logs_button:
+        st.session_state.cumulative_alerts = []
+        st.success("Audit log buffer cleared.")
 
 locations = ['Mumbai', 'Sydney', 'Bangalore', 'Melbourne', 'Unknown', 'London', 'New York']
 channels = ['ATM', 'POS', 'Online', 'Crypto_Gate', 'Wire_Transfer']
 customer_pool = [f"CUST_{i}" for i in range(101, 111)]
 
-st.write("---")
-st.info("💡 *This web application simulates live streaming AWS transaction logs being joined with a GCP compliance risk ledger via PySpark every 3 seconds.*")
-
-# 2. CONTINUOUS STREAMING REFRESH LOOP
+# 3. CONTINUOUS STREAMING REFRESH LOOP
 while True:
     status_box.markdown("🟢 **Engine Status:** Ingesting live streams from AWS S3 ledger layers...")
     
@@ -73,32 +94,64 @@ while True:
     aws_pandas_df = pd.DataFrame(generated_tx)
     aws_spark_df = spark.createDataFrame(aws_pandas_df)
     
-    # 3. RUN DISTRIBUTED TRANSFORMS ON FRESH DATA BATCHES
+    # Execute distributed relational join
     flagged_crime_df = aws_spark_df.join(gcp_spark_df, on="CUSTOMER_ID", how="inner")
-    
-    # Apply standard CommBank financial crime filtering rules
     financial_alerts_spark = flagged_crime_df.filter(
         (F.col("AMOUNT") >= 150000) | (F.col("AML_FLAG") == 1)
     )
     
     alerts_pandas = financial_alerts_spark.toPandas()
     
-    # 4. REFRESH METRIC CARDS AND AUDIT TABLES
+    # 4. STORE AND APPEND DATA IN THE HISTORY LOG
+    if not alerts_pandas.empty:
+        # Format columns safely
+        clean_batch = alerts_pandas[['CUSTOMER_ID', 'TX_TIMESTAMP', 'AMOUNT', 'LOCATION', 'CHANNEL', 'RISK_SCORE', 'WATCHLIST_STATUS']].copy()
+        
+        # Add to session state memory storage
+        for _, row in clean_batch.iterrows():
+            st.session_state.cumulative_alerts.insert(0, row.to_dict()) # Insert at top of memory index
+
+    # Convert cumulative tracking data into an analytical DataFrame
+    all_historical_df = pd.DataFrame(st.session_state.cumulative_alerts)
+    
+    # 5. REFRESH REAL-TIME METRIC BARS
     total_processed = len(aws_pandas_df)
-    total_flagged = len(alerts_pandas)
-    total_value_flagged = float(alerts_pandas['AMOUNT'].sum()) if total_flagged > 0 else 0.0
+    current_flagged_count = len(alerts_pandas)
+    cumulative_flagged_count = len(all_historical_df)
     
-    metric_col1.metric(label="Ingested Inbound Rows", value=f"+{num_tx}", delta=f"Total Batch: {total_processed}")
-    metric_col2.metric(label="Active Fraud/AML Alerts", value=total_flagged, delta="Action Required", delta_color="inverse")
-    metric_col3.metric(label="Volume Under Investigation", value=f"₹{total_value_flagged:,.2f}")
-        
-    table_title.markdown(f"### 🚨 Real-Time Compliance Audit Trail ({current_time})")
-    
-    if total_flagged > 0:
-        display_df = alerts_pandas[['CUSTOMER_ID', 'AMOUNT', 'LOCATION', 'CHANNEL', 'RISK_SCORE', 'WATCHLIST_STATUS']].copy()
-        display_df['AMOUNT'] = display_df['AMOUNT'].apply(lambda x: f"₹{x:,.2f}")
-        alert_table_placeholder.dataframe(display_df, use_container_width=True)
+    metric_col1.metric(label="Ingested Inbound Rows", value=f"+{num_tx}", delta=f"Batch Total: {total_processed}")
+    metric_col2.metric(label="Latest Batch Alerts", value=current_flagged_count, delta="Action Needed", delta_color="inverse")
+    metric_col3.metric(label="Total Stored Audit Trails", value=cumulative_flagged_count)
+
+    # 6. LAYOUT RENDERING: LATEST AT THE TOP, HISTORY BELOW
+    latest_title.markdown(f"### 🔴 Latest Live Ingestion Batch Alerts ({current_time})")
+    if current_flagged_count > 0:
+        display_latest = alerts_pandas[['CUSTOMER_ID', 'AMOUNT', 'LOCATION', 'CHANNEL', 'RISK_SCORE', 'WATCHLIST_STATUS']].copy()
+        display_latest['AMOUNT'] = display_latest['AMOUNT'].apply(lambda x: f"₹{x:,.2f}")
+        latest_table_placeholder.dataframe(display_latest, use_container_width=True)
     else:
-        alert_table_placeholder.success("✅ Current streaming batch clear. No high-risk anomalies detected.")
+        latest_table_placeholder.success("✅ Current streaming batch clear. No real-time anomalies detected.")
+
+    historical_title.markdown("### 📜 Historical Compliance Archive Logs (Pushed Down)")
+    if cumulative_flagged_count > 0:
+        display_historical = all_historical_df.copy()
+        # Format the values for the layout view grid cleanly
+        display_historical['AMOUNT'] = display_historical['AMOUNT'].apply(lambda x: f"₹{x:,.2f}")
+        historical_table_placeholder.dataframe(display_historical, use_container_width=True)
         
+        # 7. EXPORT DATA LAYER: BUILD LIVE CSV DOWNLOAD HOOK
+        csv_buffer = io.StringIO()
+        all_historical_df.to_csv(csv_buffer, index=False)
+        csv_string = csv_buffer.getvalue()
+        
+        download_placeholder.download_button(
+            label="📥 Download Audit Logs (.CSV)",
+            data=csv_string,
+            file_name=f"cba_aml_audit_log_{time.strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv",
+            key="csv_download_btn"
+        )
+    else:
+        historical_table_placeholder.info("System initializing. Awaiting cumulative streaming anomalies...")
+
     time.sleep(3)
