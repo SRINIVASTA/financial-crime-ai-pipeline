@@ -49,8 +49,8 @@ metric_col1, metric_col2, metric_col3 = st.columns(3)
 
 st.write("---")
 
-# Main interface structure splitting real-time data views from exporters
-left_view, right_view = st.columns()
+# Main interface structure - Explicitly passing 2 to fix the columns TypeError!
+left_view, right_view = st.columns(2)
 
 with left_view:
     latest_header = st.empty()
@@ -100,11 +100,11 @@ while True:
     
     current_batch_pandas = financial_alerts_spark.toPandas()
     
-    # 4. APPEND ALL RECENT ALERTS TO HISTORICAL STORAGE FIRST (NO CAP HERE)
+    # 4. APPEND ALL RECENT ALERTS TO HISTORICAL STORAGE FIRST (UNRESTRICTED)
     if not current_batch_pandas.empty:
         clean_batch = current_batch_pandas[['CUSTOMER_ID', 'TX_TIMESTAMP', 'AMOUNT', 'LOCATION', 'CHANNEL', 'RISK_SCORE', 'WATCHLIST_STATUS']].copy()
         for _, row in clean_batch.iterrows():
-            # Keep saving EVERYTHING downward into your historical session storage
+            # Keep archiving everything downward into your permanent log list
             st.session_state.cumulative_ledger.append(row.to_dict())
 
     # Build the full archive log view model
@@ -119,10 +119,9 @@ while True:
     metric_col2.metric(label="Latest Batch Alerts", value=latest_alert_count, delta="Current Cycle", delta_color="inverse")
     metric_col3.metric(label="Total Stored Audit Trails", value=total_archived_count)
 
-    # 6. RENDER THE CURRENT BATCH LOG AT THE TOP (CAPPED TO EXACTLY 3 ROWS)
+    # 6. RENDER THE CURRENT BATCH LOG AT THE TOP (CAPPED TO TOP 3 HIGHEST-VALUE ROWS)
     latest_header.markdown(f"### 🔴 Latest Live Ingestion Batch Alerts ({current_time}) — *Showing Top 3 Priority Alerts*")
     if latest_alert_count > 0:
-        # Sort by transaction amount to show highest risks first, then grab just the top 3 rows
         display_latest = current_batch_pandas.sort_values(by="AMOUNT", ascending=False).head(3).copy()
         display_latest = display_latest[['CUSTOMER_ID', 'AMOUNT', 'LOCATION', 'CHANNEL', 'RISK_SCORE', 'WATCHLIST_STATUS']]
         display_latest['AMOUNT'] = display_latest['AMOUNT'].apply(lambda x: f"₹{x:,.2f}")
