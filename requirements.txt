@@ -2,3 +2,4 @@ streamlit
 pyspark
 pandas
 numpy
+matplotlib
